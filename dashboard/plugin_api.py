@@ -246,8 +246,6 @@ async def memory_health():
     ai_peer = cfg.ai_peer or "hermes"
 
     try:
-        user_card = _get_peer_card(client, user_peer)
-        ai_card = _get_peer_card(client, ai_peer)
         sessions_page = client.sessions()
         session_count = len(sessions_page)
         peers_page = client.peers()
@@ -265,8 +263,10 @@ async def memory_health():
         "dialectic_depth": cfg.dialectic_depth,
         "dialectic_reasoning_level": cfg.dialectic_reasoning_level,
         "write_frequency": cfg.write_frequency,
-        "user_peer_facts": user_card.get("count", 0),
-        "ai_peer_facts": ai_card.get("count", 0),
+        "user_representation": _get_representation(client, user_peer),
+        "ai_representation": _get_representation(client, ai_peer),
+        "user_peer_name": user_peer,
+        "ai_peer_name": ai_peer,
         "active_sessions": session_count,
         "total_peers": peer_count,
     }

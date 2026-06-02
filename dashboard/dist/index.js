@@ -30,7 +30,7 @@
       });
     }
 
-    // ── Simple stat card (no SDK component dependency) ─────────────────
+    // ── Stat card (numeric) ─────────────────────────────────────────────
     function StatCard(props) {
       return R.createElement("div", {
         style: {
@@ -42,6 +42,33 @@
       },
         R.createElement("div", { style: { fontSize: "0.8rem", opacity: 0.6, marginBottom: "4px" } }, props.label),
         R.createElement("div", { style: { fontSize: "1.6rem", fontWeight: 700 } }, props.value ?? "\u2014")
+      );
+    }
+
+    // ── Profile card (text repr) ────────────────────────────────────────
+    function ProfileCard(props) {
+      var text = props.value || "";
+      // Truncate to ~600 chars for the card view
+      var truncated = text.length > 600 ? text.substring(0, 600) + "\u2026" : text;
+      return R.createElement("div", {
+        style: {
+          padding: "1.2rem", borderRadius: "12px",
+          background: "var(--theme-midground, #f0ece8)",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          flex: "1 1 340px", minWidth: "260px", maxWidth: "100%"
+        }
+      },
+        R.createElement("div", { style: { fontSize: "0.8rem", opacity: 0.6, marginBottom: "8px" } }, props.label),
+        truncated
+          ? R.createElement("div", {
+              style: {
+                fontSize: "0.8rem", lineHeight: "1.55", whiteSpace: "pre-wrap",
+                maxHeight: "220px", overflowY: "auto",
+                color: "var(--theme-foreground, #333)"
+              }
+            }, truncated)
+          : R.createElement("div", { style: { fontSize: "0.85rem", opacity: 0.4, fontStyle: "italic" } },
+              "No profile generated yet \u2014 Honcho\u2019s dialectic process will populate this over time.")
       );
     }
 
@@ -75,13 +102,6 @@
       }
 
       // Success — render dashboard
-      var stats = [
-        { label: "User Peer Facts",  key: "user_peer_facts" },
-        { label: "AI Peer Facts",    key: "ai_peer_facts" },
-        { label: "Active Sessions",  key: "active_sessions" },
-        { label: "Total Peers",      key: "total_peers" },
-      ];
-
       return R.createElement("div", {
         style: { padding: "2rem", maxWidth: "960px", margin: "0 auto" }
       },
@@ -92,26 +112,20 @@
             "AI-native memory. Reasoning: Gemma-4 | Embed: gemini-embedding-2")
         ),
 
-        // Stat cards
+        // Profile cards (span full width, stacked vertically on narrow screens)
+        R.createElement("div", {
+          style: { display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1.5rem" }
+        },
+          R.createElement(ProfileCard, { label: "User Profile \u2014 " + (data.user_peer_name || "you"), value: data.user_representation }),
+          R.createElement(ProfileCard, { label: "AI Profile \u2014 " + (data.ai_peer_name || "hermes"), value: data.ai_representation })
+        ),
+
+        // Stat cards (numeric)
         R.createElement("div", {
           style: { display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "2rem" }
         },
-          stats.map(function (s) {
-            return R.createElement(StatCard, { key: s.key, label: s.label, value: data[s.key] });
-          })
-        ),
-
-        // LLM model card
-        data.llm_model && R.createElement("div", {
-          style: {
-            padding: "1rem", borderRadius: "12px",
-            background: "linear-gradient(135deg, var(--theme-accent-10, rgba(255,140,0,0.08)), transparent)",
-            border: "1px solid var(--theme-accent-20, rgba(255,140,0,0.15))",
-            marginBottom: "2rem"
-          }
-        },
-          R.createElement("div", { style: { fontSize: "0.75rem", opacity: 0.5, textTransform: "uppercase", marginBottom: "4px" } }, "LLM Model"),
-          R.createElement("div", { style: { fontWeight: 600, fontSize: "1.1rem" } }, data.llm_model)
+          R.createElement(StatCard, { label: "Active Sessions", value: data.active_sessions }),
+          R.createElement(StatCard, { label: "Total Peers", value: data.total_peers })
         ),
 
         // Refresh button
