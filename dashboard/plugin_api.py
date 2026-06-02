@@ -54,11 +54,17 @@ def _get_client():
 
 
 def _get_peer_card(client: Any, peer: str) -> dict[str, Any]:
-    """Fetch a peer card, returning a normalized dict."""
+    """Fetch a peer card, returning a normalized dict.
+
+    Honcho SDK uses ``peer.get_card()`` (singular), which returns a single
+    Card object or None — NOT a list.
+    """
     try:
-        cards = client.peer(peer).get_cards()
-        card_list = [c.content for c in cards] if cards else []
-        return {"id": peer, "facts": card_list, "count": len(card_list)}
+        card = client.peer(peer).get_card()
+        if card is not None:
+            content = card.content if hasattr(card, "content") else str(card)
+            return {"id": peer, "facts": [content], "count": 1}
+        return {"id": peer, "facts": [], "count": 0}
     except Exception as e:
         return {"id": peer, "facts": [], "count": 0, "error": str(e)}
 
@@ -165,8 +171,13 @@ async def get_profile():
 
 
 @router.get("/search")
-async def search_memory(q: str = "", max_tokens: int = 800):
-    """Semantic search over Honcho's stored context about the user."""
+async def search_memory(q: str = "", limit: int = 20):
+    """Semantic search over Honcho's stored context about the user.
+
+    The Honcho SDK ``peer.search()`` accepts (query, limit) — NOT
+    (q, max_tokens).  The ``q`` query-parameter is mapped into ``query``
+    for the SDK call.
+    """
     if not q.strip():
         return {"query": "", "results": [], "hint": "Provide a ?q= parameter to search"}
 
@@ -176,7 +187,7 @@ async def search_memory(q: str = "", max_tokens: int = 800):
 
     try:
         peer_name = cfg.peer_name or "user"
-        results = client.peer(peer_name).search(q, max_tokens=min(max_tokens, 2000))
+        results = client.peer(peer_name).search(q, limit=min(limit, 100))
         return {
             "query": q,
             "peer": peer_name,
@@ -192,23 +203,30 @@ async def search_memory(q: str = "", max_tokens: int = 800):
 
 @router.get("/sessions")
 async def list_sessions(limit: int = 20):
-    """List recent Honcho sessions."""
+    """List recent Honcho sessions.
+
+    Honcho SDK ``Session`` objects expose ``id``, ``workspace_id``, and
+    ``metadata`` — there is NO ``name`` or ``message_count`` attribute.
+    ``sessions()`` returns a ``SyncPage`` (no ``limit`` parameter) — we
+    slice to the requested limit ourselves.
+    """
     client, cfg = _get_client()
     if not client:
         return {"error": "Honcho not configured or unreachable", "sessions": []}
 
     try:
-        sessions = client.sessions(limit=limit)
+        page = client.sessions()
+        raw = list(page.items)[:min(limit, len(page.items))]
         return {
             "sessions": [
                 {
                     "id": s.id,
-                    "name": getattr(s, "name", s.id),
-                    "created_at": str(getattr(s, "created_at", "")),
-                    "message_count": getattr(s, "message_count", 0),
+                    "workspace_id": s.workspace_id,
+                    "metadata": s.metadata if hasattr(s, "metadata") else {},
                 }
-                for s in sessions
+                for s in raw
             ],
+            "total": len(page.items),
         }
     except Exception as e:
         return {"sessions": [], "error": str(e)}
@@ -230,8 +248,10 @@ async def memory_health():
     try:
         user_card = _get_peer_card(client, user_peer)
         ai_card = _get_peer_card(client, ai_peer)
-        sessions = client.sessions(limit=100)
-        peers = client.peers()
+        sessions_page = client.sessions()
+        session_count = len(sessions_page)
+        peers_page = client.peers()
+        peer_count = len(peers_page)
     except Exception as e:
         return {"error": str(e), "honcho_available": True}
 
@@ -242,14 +262,14 @@ async def memory_health():
         "recall_mode": cfg.recall_mode,
         "observation_mode": cfg.observation_mode,
         "session_strategy": cfg.session_strategy,
-        "dialectic_cadence": getattr(cfg, "dialectic_cadence", 1),
+        "dialectic_cadence": cfg.dialectic_cadence if cfg.dialectic_cadence is not None else 1,
         "dialectic_depth": cfg.dialectic_depth,
         "dialectic_reasoning_level": cfg.dialectic_reasoning_level,
         "write_frequency": cfg.write_frequency,
         "user_peer_facts": user_card.get("count", 0),
         "ai_peer_facts": ai_card.get("count", 0),
-        "active_sessions": len(sessions) if sessions else 0,
-        "total_peers": len(peers) if peers else 0,
+        "active_sessions": session_count,
+        "total_peers": peer_count,
     }
 
 
