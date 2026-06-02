@@ -1,0 +1,5 @@
+name: hermes-honcho-dashboard
+version: 1.0.0
+description: "Honcho AI-native memory explorer for the Hermes dashboard — peer cards, semantic search, LLM model info, and memory health"
+author: Hengky
+kind: dashboard
