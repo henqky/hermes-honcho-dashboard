@@ -262,7 +262,6 @@ async def memory_health():
         "recall_mode": cfg.recall_mode,
         "observation_mode": cfg.observation_mode,
         "session_strategy": cfg.session_strategy,
-        "dialectic_cadence": cfg.dialectic_cadence if cfg.dialectic_cadence is not None else 1,
         "dialectic_depth": cfg.dialectic_depth,
         "dialectic_reasoning_level": cfg.dialectic_reasoning_level,
         "write_frequency": cfg.write_frequency,
